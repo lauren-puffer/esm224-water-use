@@ -186,9 +186,72 @@ water_use_long <- water_use_industry |>
   select(-category)
 ```
 
-We are going to save this dataset for future use.
+We are going to save this data set for future use.
 
 ```{r}
 # save dataset
 write.csv(water_use_long, here("data", "water_by_use.csv"))
+```
+
+## Make bar graph of water use by county
+
+```{r}
+# load cowplot for stacked visualizations
+library(patchwork)
+
+# consistent color palette
+colors <- c("ground" = "#009E73",  # green
+            "surface" = "#1f77b4") # blue
+
+# create dataset for Butte county
+butte_water <- water_use_long |>
+      filter(county == "Butte")
+  
+# make a bar graph for butte county water use
+butte_bar <- ggplot(butte_water, aes(x = use, y = mgal_day, fill = source)) +
+      geom_bar(stat = "identity", position = position_dodge()) +
+      scale_fill_manual(values = colors) +
+      labs(
+        title = "Water Use in Butte County, CA",
+        x = "Water Use Type",
+        y = "Million Gallons per Day",
+        fill = "Water Source"
+      ) +
+      theme_minimal() +
+      theme(
+        axis.text.x = element_text(hjust = 1),
+        plot.background = element_rect(fill = "white", color = NA)
+      )
+```
+
+Now, do the same for plumas.
+
+```{r}
+# create dataset for Plumas county
+plumas_water <- water_use_long |>
+      filter(county == "Plumas")
+
+# make a bar graph for butte county water use
+plumas_bar <- ggplot(plumas_water, aes(x = use, y = mgal_day, fill = source)) +
+      geom_bar(stat = "identity", position = position_dodge()) +
+      scale_fill_manual(values = colors) +
+      labs(
+        title = "Water Use in Plumas County, CA",
+        x = "Water Use Type",
+        y = "Million Gallons per Day",
+        fill = "Water Source"
+      ) +
+      theme_minimal() +
+      theme(
+        axis.text.x = element_text(hjust = 1),
+        plot.background = element_rect(fill = "white", color = NA)
+      )
+```
+
+Stack plots on top of each other.
+
+```{r}
+# stack bar graphs
+combined <- butte_bar/plumas_bar
+print(combined)
 ```
