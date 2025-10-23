@@ -28,11 +28,160 @@ water_use <- read.csv(here("data", "MF_WaterUse_per_day.csv"))
 summary(water_use)
 ```
 
-You can add options to executable code like this
+## Data cleaning
+
+Select for columns with self-supplied surface water and self-supplied groundwater.
 
 ```{r}
-#| echo: false
-2 * 2
+# filter for county
+water_use_clean <- water_use |>
+  select(County,  Public.Supply.total.self.supplied.withdrawals..surface.water..in.Mgal.d., 
+          Public.Supply.total.self.supplied.withdrawals..groundwater..in.Mgal.d.) |>
+  clean_names() 
+
+# get summary of names
+summary(water_use_clean)
+
+# rename titles of columns
+water_use_clean <- rename(water_use_clean, public_self_surface = public_supply_total_self_supplied_withdrawals_surface_water_in_mgal_d, 
+          public_self_groundwater =  public_supply_total_self_supplied_withdrawals_groundwater_in_mgal_d)
+
+# pivot the dataset longer
+water_use_long <- water_use_clean |>
+  pivot_longer(
+    cols = c(public_self_surface, public_self_groundwater),
+    names_to = "water_source",
+    values_to = "mgal_day")
+
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+## Data visualization
+
+```{r}
+# make bar graph of groundwater and surface water stacked and separated by county
+gw_sw_bar <-ggplot(water_use_long, aes(x = county, y = mgal_day, fill = water_source)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Public Self-Supplied Water Withdrawals by County",
+    x = "County",
+    y = "Million Gallons per Day (Mgal/d)",
+    fill = "Water Source"
+  ) +
+  scale_fill_manual(
+  values = c("public_self_surface" = "#1f77b4", 
+             "public_self_groundwater" = "#2ca02c"),
+  labels = c("public_self_surface" = "Surface Water",
+             "public_self_groundwater" = "Ground Water"))+
+  theme_minimal() +
+    theme(axis.text.x = element_text(hjust = 1),
+          plot.background = element_rect(fill = "white", color = NA)) +
+  theme(axis.text.x = element_text(hjust = 1))
+
+print(gw_sw_bar)
+```
+
+Save the bar graph!
+
+```{r}
+ggsave(filename = here("plots", "public_withdrawl.png"),
+  plot = gw_sw_bar,
+  width = 10,
+  height = 6,
+  dpi = 300)
+```
+
+# Diverse water uses by county
+
+We need to bring back some of the categories that we previously got rid of. We will do this by bringing in the raw "water_use" file.
+
+## Data cleaning
+
+```{r}
+# clean names so categories are easier to read
+water_use_industry <- water_use |>
+  clean_names() 
+
+# select for only the categories of self supply by industry
+water_use_industry <- water_use_industry |>
+  select(county, 
+         # domestic
+         domestic_self_supplied_groundwater_withdrawals_fresh_in_mgal_d, 
+         domestic_self_supplied_surface_water_withdrawals_fresh_in_mgal_d,
+         
+         # industrial
+         industrial_self_supplied_groundwater_withdrawals_fresh_in_mgal_d,
+         industrial_self_supplied_surface_water_withdrawals_fresh_in_mgal_d,
+         
+         # mining
+         mining_self_supplied_groundwater_withdrawals_fresh_in_mgal_d,
+         mining_self_supplied_surface_water_withdrawals_fresh_in_mgal_d,
+         
+         # livestock
+         livestock_self_supplied_groundwater_withdrawals_fresh_in_mgal_d,
+         livestock_self_supplied_surface_water_withdrawals_fresh_in_mgal_d,
+         
+         # aquaculture
+         aquaculture_self_supplied_groundwater_withdrawals_fresh_in_mgal_d,
+         aquaculture_self_supplied_surface_water_withdrawals_fresh_in_mgal_d,
+         
+         # crop irrigation
+         irrigation_crop_self_supplied_groundwater_withdrawals_for_crops_fresh_in_mgal_d,
+         irrigation_crop_self_supplied_surface_water_withdrawals_for_crops_fresh_in_mgal_d,
+         
+         # golf irrigation
+         irrigation_golf_courses_self_supplied_groundwater_withdrawals_for_golf_courses_fresh_in_mgal_d,
+         irrigation_golf_courses_self_supplied_surface_water_withdrawals_for_golf_courses_fresh_in_mgal_d)
+```
+
+Soo many names! Shorten the column titles.
+
+```{r}
+# create dataset with shorter column names
+water_use_industry <- rename(water_use_industry, 
+                             domestic_ground = domestic_self_supplied_groundwater_withdrawals_fresh_in_mgal_d, 
+                             domestic_surface = domestic_self_supplied_surface_water_withdrawals_fresh_in_mgal_d, 
+                             industrial_ground = industrial_self_supplied_groundwater_withdrawals_fresh_in_mgal_d, 
+                             industrial_surface = 
+industrial_self_supplied_surface_water_withdrawals_fresh_in_mgal_d, 
+                             mining_ground =
+mining_self_supplied_groundwater_withdrawals_fresh_in_mgal_d, 
+                             mining_surface =
+mining_self_supplied_surface_water_withdrawals_fresh_in_mgal_d,
+                             livestock_ground = 
+livestock_self_supplied_groundwater_withdrawals_fresh_in_mgal_d, 
+                             livestock_surface = 
+livestock_self_supplied_surface_water_withdrawals_fresh_in_mgal_d,
+                             aquaculture_ground =
+aquaculture_self_supplied_groundwater_withdrawals_fresh_in_mgal_d,
+                            aquaculture_surface =
+aquaculture_self_supplied_surface_water_withdrawals_fresh_in_mgal_d,
+                            crop_ground =
+irrigation_crop_self_supplied_groundwater_withdrawals_for_crops_fresh_in_mgal_d,
+                            crop_surface =
+irrigation_crop_self_supplied_surface_water_withdrawals_for_crops_fresh_in_mgal_d,
+                            golf_ground =
+irrigation_golf_courses_self_supplied_groundwater_withdrawals_for_golf_courses_fresh_in_mgal_d,
+                            golf_surface =
+irrigation_golf_courses_self_supplied_surface_water_withdrawals_for_golf_courses_fresh_in_mgal_d)
+```
+
+Pivot longer to create one column fo industry and one column for ground/surface water.
+
+```{r}
+# load stringr to use str_detect to separate by "_"
+library(stringr)
+
+# use pivot_longer() and str_extract() to improve dataset
+water_use_long <- water_use_industry |>
+  pivot_longer(
+    cols = ends_with(c("_ground", "_surface")),  # or simply everything except County if that’s the ID
+    names_to = "category",
+    values_to = "mgal_day"
+  ) |>
+  mutate(
+    # separate "category" like "industrial_ground" into two pieces:
+    use = str_extract(category, "^[^_]+"),       # everything before first "_"
+    source = str_extract(category, "(?<=_)\\w+$") # everything after last "_"
+  ) |>
+  select(-category)
+```
