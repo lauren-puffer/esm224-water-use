@@ -185,3 +185,10 @@ water_use_long <- water_use_industry |>
   ) |>
   select(-category)
 ```
+
+We are going to save this dataset for future use.
+
+```{r}
+# save dataset
+write.csv(water_use_long, here("data", "water_by_use.csv"))
+```
