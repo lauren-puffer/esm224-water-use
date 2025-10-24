@@ -22,7 +22,7 @@ Use values for self supplied ground and surface water for Plumas and Butte count
 
 ```{r}
 # read in population data csv
-water_use <- read.csv(here("data", "MF_WaterUse_per_day.csv"))
+water_use <- read.csv(here("data", "MF_WaterUse_Butte_Plumas_Sierra_raw.csv"))
 
 # look at the data
 summary(water_use)
@@ -35,7 +35,7 @@ Select for columns with self-supplied surface water and self-supplied groundwate
 ```{r}
 # filter for county
 water_use_clean <- water_use |>
-  select(County,  Public.Supply.total.self.supplied.withdrawals..surface.water..in.Mgal.d., 
+  select(County.Name,  Public.Supply.total.self.supplied.withdrawals..surface.water..in.Mgal.d., 
           Public.Supply.total.self.supplied.withdrawals..groundwater..in.Mgal.d.) |>
   clean_names() 
 
@@ -44,7 +44,8 @@ summary(water_use_clean)
 
 # rename titles of columns
 water_use_clean <- rename(water_use_clean, public_self_surface = public_supply_total_self_supplied_withdrawals_surface_water_in_mgal_d, 
-          public_self_groundwater =  public_supply_total_self_supplied_withdrawals_groundwater_in_mgal_d)
+          public_self_groundwater =  public_supply_total_self_supplied_withdrawals_groundwater_in_mgal_d,
+          county = county_name)
 
 # pivot the dataset longer
 water_use_long <- water_use_clean |>
