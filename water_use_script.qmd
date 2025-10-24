@@ -104,7 +104,7 @@ water_use_industry <- water_use |>
 
 # select for only the categories of self supply by industry
 water_use_industry <- water_use_industry |>
-  select(county, 
+  select(county_name, 
          # domestic
          domestic_self_supplied_groundwater_withdrawals_fresh_in_mgal_d, 
          domestic_self_supplied_surface_water_withdrawals_fresh_in_mgal_d,
@@ -138,7 +138,8 @@ Soo many names! Shorten the column titles.
 
 ```{r}
 # create dataset with shorter column names
-water_use_industry <- rename(water_use_industry, 
+water_use_industry <- rename(county = county_name, 
+                             water_use_industry, 
                              domestic_ground = domestic_self_supplied_groundwater_withdrawals_fresh_in_mgal_d, 
                              domestic_surface = domestic_self_supplied_surface_water_withdrawals_fresh_in_mgal_d, 
                              industrial_ground = industrial_self_supplied_groundwater_withdrawals_fresh_in_mgal_d, 
@@ -206,7 +207,7 @@ colors <- c("ground" = "#009E73",  # green
 
 # create dataset for Butte county
 butte_water <- water_use_long |>
-      filter(county == "Butte")
+      filter(county == "Butte County")
   
 # make a bar graph for butte county water use
 butte_bar <- ggplot(butte_water, aes(x = use, y = mgal_day, fill = source)) +
@@ -230,7 +231,7 @@ Now, do the same for plumas.
 ```{r}
 # create dataset for Plumas county
 plumas_water <- water_use_long |>
-      filter(county == "Plumas")
+      filter(county == "Plumas County")
 
 # make a bar graph for butte county water use
 plumas_bar <- ggplot(plumas_water, aes(x = use, y = mgal_day, fill = source)) +
@@ -249,10 +250,44 @@ plumas_bar <- ggplot(plumas_water, aes(x = use, y = mgal_day, fill = source)) +
       )
 ```
 
+Repeat the process for Sierra County.
+
+```{r}
+# create dataset for Plumas county
+sierra_water <- water_use_long |>
+      filter(county == "Sierra County")
+
+# make a bar graph for butte county water use
+sierra_bar <- ggplot(sierra_water, aes(x = use, y = mgal_day, fill = source)) +
+      geom_bar(stat = "identity", position = position_dodge()) +
+      scale_fill_manual(values = colors) +
+      labs(
+        title = "Water Use in Sierra County, CA",
+        x = "Water Use Type",
+        y = "Million Gallons per Day",
+        fill = "Water Source"
+      ) +
+      theme_minimal() +
+      theme(
+        axis.text.x = element_text(hjust = 1),
+        plot.background = element_rect(fill = "white", color = NA)
+      )
+```
+
 Stack plots on top of each other.
 
 ```{r}
 # stack bar graphs
-combined <- butte_bar/plumas_bar
+combined <- butte_bar/plumas_bar/sierra_bar
 print(combined)
+```
+
+## Create dataset with totals 
+
+```{r}
+# bring in raw dataset
+
+# select for columns with totals
+
+# filter 
 ```
