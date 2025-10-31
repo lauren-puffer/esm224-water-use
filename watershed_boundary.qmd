@@ -1,0 +1,151 @@
+---
+title: "Watershed Boundary"
+author: "Lauren Puffer"
+format: html
+editor: visual
+---
+
+## Load libraries
+
+```{r}
+library(terra)
+library(tmap)
+library(tigris)
+library(here)
+library(sf)
+library(tidyverse)
+library(spData)
+library(stars)
+```
+
+## County shape file
+
+Use 'tigris' package to get county shape file.
+
+```{r}
+# get counties from 'tigris'
+options(tigris_class = "sf")
+
+# bring in shape file of California counties 
+ca_counties <- counties(state = "CA", progress_bar = FALSE)
+```
+
+You can add options to executable code like this
+
+```{r}
+# bring in shape file of HUC 18020123
+hucs <- st_read(here("watershed_shape","cat.shp"))
+
+# check if in degrees or meters
+st_bbox(hucs)
+st_crs(hucs) <- 5070
+
+# select for teh HUC 8 of our watershed
+huc_18020123 <- hucs |>
+  filter(HUC8 == "18020123")
+
+# check crs
+st_crs(huc_18020123) # epsg 5070
+
+# chekc bounding box for both
+st_bbox(huc_18020123)
+st_bbox(ca_counties)
+
+# plot
+tm_shape(huc_18020123)+
+  tm_polygons()
+
+# get crs
+st_crs(huc_18020123) # No CRS
+
+# get crs of counties
+st_crs(ca_counties) # epsg 4269
+
+# assign crs to huc 8
+huc_18020123 <- st_transform(huc_18020123, st_crs(ca_counties))
+
+# check that they macth
+st_crs(ca_counties) == st_crs(huc_18020123)
+
+# plot the HUC 8
+tm_shape(huc_18020123) +
+  tm_polygons(fill = "red")
+
+# plot counties and huc 8
+tm_shape(ca_counties)+
+  tm_borders(col = "blue")+
+  tm_shape(huc_18020123)+
+  tm_polygons(fill = "red", fill_alpha = 0.5)
+```
+
+## Getting area
+
+```{r}
+# check 
+st_crs(huc_18020123)
+st_crs(ca_counties)
+st_bbox(huc_18020123)
+st_bbox(ca_counties)
+
+# Confirm CRS before transforming
+st_crs(huc_18020123) <- 3857   # Web Mercator
+st_crs(ca_counties) <- 5070    # NAD83 / Conus Albers (if not already)
+
+huc_18020123 <- st_transform(huc_18020123, st_crs(ca_counties))
+
+# check bbox
+st_bbox(huc_18020123)
+st_bbox(ca_counties)
+
+# Transform HUC to match counties
+huc_18020123 <- st_transform(huc_18020123, st_crs(ca_counties))
+
+
+# Make sure both layers have CRS set
+st_crs(huc_18020123) <- 5070
+ca_counties <- st_transform(ca_counties, 5070)
+
+# get intersecting polygons
+huc_county_intersect <- st_intersection(huc_18020123, ca_counties)
+
+
+# calculate area
+huc_county_intersect$area_m2 <- st_area(huc_county_intersect)
+
+# Total area of the HUC
+total_area <- sum(huc_county_intersect$area_m2)
+
+
+# Summarize by county
+county_area_summary <- huc_county_intersect |>
+  st_drop_geometry() |>
+  group_by(NAME.1) |>                # replace NAME with your county column
+  summarise(area_m2 = sum(as.numeric(area_m2))) |>
+  mutate(percent_of_huc = 100 * area_m2 / as.numeric(total_area)) |>
+  arrange(desc(percent_of_huc))
+
+# View results
+county_area_summary
+
+# load kable
+library(kableExtra)
+
+table <- county_area_summary |>
+  kable(format = "html",
+        col.names = c("County Name", "Area (m²)", "% of Watershed Area"),
+        digits = 2,
+        align = "lrr") %>%
+  kable_styling("striped", full_width = FALSE)
+
+```
+
+save the table.
+
+```{r}
+# load package for saving htmls
+library(htmltools)
+
+save_html(table, here("county_area_summary.html"))
+
+
+```

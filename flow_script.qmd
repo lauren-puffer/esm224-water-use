@@ -1,0 +1,111 @@
+---
+title: "Flow Gauge Analysis"
+author: "Lauren Puffer"
+format: html
+editor: visual
+---
+
+## Load packages
+
+```{r}
+library(here)
+library(tidyverse)
+library(janitor)
+library(tmap)
+library(terra)
+library(tigris)
+library(here)
+library(sf)
+library(spData)
+library(stars)
+```
+
+## Load data
+
+Data comes from 3 locations throughout the watershed.
+
+```{r}
+# load data from strawberry station
+strawb_flow <- read.csv(here("data", "flow_gauges", "SF FEATHER R BL DIV DAM NR STRA.csv"))|>
+  clean_names()
+
+# load data from forbestown station
+forbes_flow <- read.csv(here("data", "flow_gauges", "SF FEATHER R BL FORBESTOWN DAM.csv"))|>
+  clean_names()
+
+# load data from little grass valley station
+grass_flow <- read.csv(here("data", "flow_gauges", "SF FEATHER R BL LITTLE GRASS VA.csv"))|>
+  clean_names()
+```
+
+## Data cleaning
+
+```{r}
+# load lubridate
+library(lubridate)
+
+# Structure
+# df$date <- mdy_hm(df$date)
+
+# use lubridate to fix the dates in strawb_flow
+strawb_flow$date <- mdy_hm(strawb_flow$date) # starts at 2001?
+
+# use lubridate to fix the dates in forbes_flow
+forbes_flow$date <- mdy_hm(forbes_flow$date)
+
+# use lubridate to fix the dates in grass_flow
+grass_flow$date <- mdy_hm(grass_flow$date)
+```
+
+Now we can get flows (discharge_m3_s) over time (date).
+
+## Plot discharge over time
+
+We will have to do this for each station. Then we will use patchwork to display them all at once. This will likely be a line graph!
+
+```{r}
+# load patchwork
+library(patchwork)
+
+# create line graph for strawb station
+strawb_plot <- ggplot(strawb_flow, aes(x = date, y = discharge_m3_s)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  labs(
+    title = "Flows near Strawberry Valley, CA",
+    x = "Date",
+    y = expression(" ")
+  ) +
+  scale_x_datetime(date_labels = "%Y", date_breaks = "2 years")+
+  theme_minimal()
+
+# create line graph for forbes station
+forbes_plot <- ggplot(forbes_flow, aes(x = date, y = dsicharge_m3_s)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  labs(
+    title = "Flows near Forbestown, CA",
+    x = "Date",
+    y = expression("Discharge (m"^3*"/s)")
+  ) +
+  scale_x_datetime(date_labels = "%Y", date_breaks = "2 years")+
+  theme_minimal()
+
+# create line graph for little grass valley station
+grass_plot <- ggplot(grass_flow, aes(x = date, y = dishcarge_m3_s)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  labs(
+    title = "Flows near Grass Valley, CA",
+    x = "Date",
+    y = expression(" ")
+  ) +
+    scale_x_datetime(date_labels = "%Y", date_breaks = "2 years")+
+  theme_minimal()
+
+# plot graphs together
+strawb_plot/forbes_plot/grass_plot
+```
+
+Save the plot
+
+```{r}
+
+```

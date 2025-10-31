@@ -143,8 +143,7 @@ Soo many names! Shorten the column titles.
 
 ```{r}
 # create dataset with shorter column names
-water_use_industry <- rename(county = county_name, 
-                             water_use_industry, 
+water_use_industry <- rename(water_use_industry, 
                              domestic_ground = domestic_self_supplied_groundwater_withdrawals_fresh_in_mgal_d, 
                              domestic_surface = domestic_self_supplied_surface_water_withdrawals_fresh_in_mgal_d, 
                              industrial_ground = industrial_self_supplied_groundwater_withdrawals_fresh_in_mgal_d, 
@@ -169,7 +168,11 @@ irrigation_crop_self_supplied_surface_water_withdrawals_for_crops_fresh_in_mgal_
                             golf_ground =
 irrigation_golf_courses_self_supplied_groundwater_withdrawals_for_golf_courses_fresh_in_mgal_d,
                             golf_surface =
-irrigation_golf_courses_self_supplied_surface_water_withdrawals_for_golf_courses_fresh_in_mgal_d)
+irrigation_golf_courses_self_supplied_surface_water_withdrawals_for_golf_courses_fresh_in_mgal_d, 
+                            pubic_surface =
+public_supply_total_self_supplied_withdrawals_surface_water_in_mgal_d,
+                            public_ground =
+         public_supply_total_self_supplied_withdrawals_groundwater_in_mgal_d)
 
 # make a column with the sum of all water used for each county
 water_use_industry$total_water_use <- rowSums(water_use_industry[sapply(water_use_industry, is.numeric)])
@@ -177,13 +180,13 @@ water_use_industry$total_water_use <- rowSums(water_use_industry[sapply(water_us
 # get total ground and total surface
 
 # Identify columns with "groundwater" in their name
-gw_cols <- names(water_use_industry)[str_detect(names(water_use_industry), "groundwater")]
+gw_cols <- names(water_use_industry)[str_detect(names(water_use_industry), "ground")]
 
 # Create a new column that sums them
 water_use_industry$total_groundwater <- rowSums(water_use_industry[, gw_cols])
 
 # Identify columns with "surface_water" in their name
-gw_cols_surf <- names(water_use_industry)[str_detect(names(water_use_industry), "surface_water")]
+gw_cols_surf <- names(water_use_industry)[str_detect(names(water_use_industry), "surface")]
 
 # Create a new column that sums them
 water_use_industry$total_surface_water <- rowSums(water_use_industry[, gw_cols_surf])
@@ -208,6 +211,16 @@ water_use_long <- water_use_industry |>
     source = str_extract(category, "(?<=_)\\w+$") # everything after last "_"
   ) |>
   select(-category)
+
+# alter dataset to only have totals by ground and surface
+county_source_totals <- water_use_long |>
+  group_by(county_name, source) |>
+  summarise(total_mgal = sum(mgal_day, na.rm = TRUE), .groups = "drop") |>
+  pivot_wider(
+    names_from = source,
+    values_from = total_mgal,
+    names_prefix = "total_"
+  )
 ```
 
 We are going to save this data set for future use.
@@ -224,84 +237,49 @@ write.csv(water_use_long, here("data", "water_by_use.csv"))
 library(patchwork)
 
 # consistent color palette
-colors <- c("ground" = "#009E73",  # green
-            "surface" = "#1f77b4") # blue
+colors <- c("pct_ground" = "#2ca02c",  # green
+            "pct_surface" = "#1f77b4") # blue
 
-# create dataset for Butte county
-butte_water <- water_use_long |>
-      filter(county == "Butte County")
-  
-# make a bar graph for butte county water use
-butte_bar <- ggplot(butte_water, aes(x = use, y = mgal_day, fill = source)) +
-      geom_bar(stat = "identity", position = position_dodge()) +
-      scale_fill_manual(values = colors) +
-      labs(
-        title = "Water Use in Butte County, CA",
-        x = "Water Use Type",
-        y = "Million Gallons per Day",
-        fill = "Water Source"
-      ) +
-      theme_minimal() +
-      theme(
-        axis.text.x = element_text(hjust = 1),
-        plot.background = element_rect(fill = "white", color = NA)
-      )
+# create dataset for percentage plot
+plot_data <- county_source_totals |>
+  group_by(county_name) |>
+  mutate(pct_ground = total_ground / (total_ground+total_surface) * 100) |>
+  mutate(pct_surface = total_surface / (total_ground+total_surface)*100)|>
+  ungroup()
+
 ```
 
-Now, do the same for plumas.
+## Plot percentages for ground and surface water
 
 ```{r}
-# create dataset for Plumas county
-plumas_water <- water_use_long |>
-      filter(county == "Plumas County")
-
-# make a bar graph for butte county water use
-plumas_bar <- ggplot(plumas_water, aes(x = use, y = mgal_day, fill = source)) +
-      geom_bar(stat = "identity", position = position_dodge()) +
-      scale_fill_manual(values = colors) +
-      labs(
-        title = "Water Use in Plumas County, CA",
-        x = "Water Use Type",
-        y = "Million Gallons per Day",
-        fill = "Water Source"
-      ) +
-      theme_minimal() +
-      theme(
-        axis.text.x = element_text(hjust = 1),
-        plot.background = element_rect(fill = "white", color = NA)
-      )
+# pivot longer AGAIN
+plot_data <- plot_data |>
+  pivot_longer(
+    cols = c(pct_ground, pct_surface),
+    names_to = "source",
+    values_to = "pct"
+  )
+# use plot_data df for geom_col()
+water_use_plot <- ggplot(plot_data, aes(x = county_name, y = pct, fill = source)) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  scale_fill_manual(values = colors)+
+  labs(
+    x = "County",
+    y = "Percentage of Total Withdrawals",
+    fill = "Water Source",
+    title = "Groundwater vs Surface Water Percentage by County"
+  ) +
+  theme_minimal()
 ```
 
-Repeat the process for Sierra County.
-
 ```{r}
-# create dataset for Plumas county
-sierra_water <- water_use_long |>
-      filter(county == "Sierra County")
-
-# make a bar graph for butte county water use
-sierra_bar <- ggplot(sierra_water, aes(x = use, y = mgal_day, fill = source)) +
-      geom_bar(stat = "identity", position = position_dodge()) +
-      scale_fill_manual(values = colors) +
-      labs(
-        title = "Water Use in Sierra County, CA",
-        x = "Water Use Type",
-        y = "Million Gallons per Day",
-        fill = "Water Source"
-      ) +
-      theme_minimal() +
-      theme(
-        axis.text.x = element_text(hjust = 1),
-        plot.background = element_rect(fill = "white", color = NA)
-      )
-```
-
-Stack plots on top of each other.
-
-```{r}
-# stack bar graphs
-combined <- butte_bar/plumas_bar/sierra_bar
-print(combined)
+# save plot
+ggsave(filename = here("plots", "withdrawl_by_county.png"),
+  plot = water_use_plot,
+  width = 10,
+  height = 6,
+  dpi = 300)
 ```
 
 ## Create dataset with totals
