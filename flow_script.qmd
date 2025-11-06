@@ -16,7 +16,6 @@ library(terra)
 library(tigris)
 library(here)
 library(sf)
-library(spData)
 library(stars)
 ```
 
@@ -72,7 +71,7 @@ strawb_plot <- ggplot(strawb_flow, aes(x = date, y = discharge_m3_s)) +
   geom_line(color = "steelblue", linewidth = 1) +
   labs(
     title = "Flows near Strawberry Valley, CA",
-    x = "Date",
+    x = " ",
     y = expression(" ")
   ) +
   scale_x_datetime(date_labels = "%Y", date_breaks = "2 years")+
@@ -83,7 +82,7 @@ forbes_plot <- ggplot(forbes_flow, aes(x = date, y = dsicharge_m3_s)) +
   geom_line(color = "steelblue", linewidth = 1) +
   labs(
     title = "Flows near Forbestown, CA",
-    x = "Date",
+    x = " ",
     y = expression("Discharge (m"^3*"/s)")
   ) +
   scale_x_datetime(date_labels = "%Y", date_breaks = "2 years")+
@@ -94,18 +93,127 @@ grass_plot <- ggplot(grass_flow, aes(x = date, y = dishcarge_m3_s)) +
   geom_line(color = "steelblue", linewidth = 1) +
   labs(
     title = "Flows near Grass Valley, CA",
-    x = "Date",
+    x = "Year",
     y = expression(" ")
   ) +
     scale_x_datetime(date_labels = "%Y", date_breaks = "2 years")+
   theme_minimal()
 
 # plot graphs together
-strawb_plot/forbes_plot/grass_plot
+discharge_plot <- strawb_plot/forbes_plot/grass_plot
 ```
 
 Save the plot
 
 ```{r}
+# save patchwork plot
+ggsave(filename = here("plots", "discharge_by_station.png"),
+  plot = discharge_plot,
+  width = 10,
+  height = 6,
+  dpi = 300)
+```
+
+## Create a table of gauge stations
+
+We will create our own dataset with information about the flow gauges.
+
+```{r}
+# create a data frame manually with site name, site id, and period of record
+flow_station_df <- data.frame(
+  site_id = c("11395200", "11396200", "11395030"),
+  site_name = c("South Fork Feather River Below Diversion Dam Near Strawberry Valley CA ",
+                "South Fork Feather River Below Forbestown Dam", "South Fork Feather River Below Little Grass Valley"),
+  period_of_record = c("1961–present", "1961–present", "1961–present"),
+  stringsAsFactors = FALSE
+)
+
+# View the dataframe
+print(flow_station_df)
+```
+
+Create a table of flow gauge stations and period of record.
+
+```{r}
+# Load required packages
+library(knitr)
+library(kableExtra)
+
+# Create a styled table
+flow_station_df %>%
+  kable(
+    col.names = c("Site ID", "Site Name", "Period of Record"),
+    caption = "Flow Gauge Stations"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    font_size = 14
+  ) %>%
+  row_spec(0, extra_css = "font-family: 'EB Garamond', serif;") %>%
+  row_spec(1:3, extra_css = "font-family: 'EB Garamond', serif;")
+
+```
+
+Now, we want to get the means, mins and max's of our flow station data by station.
+
+```{r}
+# make sure discharge is numeric
+strawb_flow |>
+  mutate(discharge_m3_s = as.numeric(discharge_m3_s))
+
+forbes_flow <- forbes_flow |>
+  mutate(discharge_m3_s = as.numeric(dsicharge_m3_s))
+
+grass_flow <- grass_flow |>
+  mutate(discharge_m3_s = as.numeric(dishcarge_m3_s))
+
+# get flow means
+mean_strawb <- mean(strawb_flow$discharge_m3_s)
+mean_forbes <- mean(forbes_flow$discharge_m3_s)
+mean_grass <- mean(grass_flow$discharge_m3_s)
+
+# get the mins
+min_strawb <- min(strawb_flow$discharge_m3_s)
+min_forbes <- min(forbes_flow$discharge_m3_s)
+min_grass <- min(grass_flow$discharge_m3_s)
+
+
+# get the max
+max_strawb <- max(strawb_flow$discharge_m3_s)
+max_forbes <- max(forbes_flow$discharge_m3_s)
+max_grass <- max(grass_flow$discharge_m3_s)
+```
+
+Make a summary dataframe.
+
+```{r}
+# make a summary of all mean, min, and max
+# Combine your summary statistics into a data frame
+flow_summary <- data.frame(
+  site_name = c("South Fork Feather River Below Diversion Dam Near Strawberry Valley CA ",
+                "South Fork Feather River Below Forbestown Dam", "South Fork Feather River Below Little Grass Valley"),
+  mean_flow_m3_s = c(mean_strawb, mean_forbes, mean_grass),
+  min_flow_m3_s = c(min_strawb, min_forbes, min_grass),
+  max_flow_m3_s = c(max_strawb, max_forbes, max_grass)
+)
+```
+
+Now we can make the table.
+
+```{r}
+# Create a nicely formatted table
+flow_summary %>%
+  kable(
+    col.names = c("Site Name", "Mean Flow (m³/s)", "Min Flow (m³/s)", "Max Flow (m³/s)"),
+    caption = "Summary of Flow Statistics by Site"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    font_size = 14
+  ) %>%
+  row_spec(0, extra_css = "font-family: 'EB Garamond', serif;") %>%
+  row_spec(1:nrow(flow_summary), extra_css = "font-family: 'EB Garamond', serif;")
 
 ```
