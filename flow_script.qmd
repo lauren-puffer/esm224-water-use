@@ -217,3 +217,63 @@ flow_summary %>%
   row_spec(1:nrow(flow_summary), extra_css = "font-family: 'EB Garamond', serif;")
 
 ```
+
+## Flow gauge location
+
+```{r}
+# add latitude and longitude to flow_station_df
+flow_station_df$latitude <- c(39.6475,39.5514, 39.7239 )
+
+flow_station_df$longitude <- c(-121.1178, -121.2083,-121.0211 )
+```
+
+Change these points to geometries.
+
+```{r}
+# make geometries from lat and longs
+df_sf <- st_as_sf(flow_station_df, coords = c("longitude", "latitude"), crs = 4267) # NAD 27 used in USGS flow station data
+
+# get base map of california
+library(tigris)
+
+# get 'california' from tigris
+# Load California county boundaries with the state's shapefile
+ca_counties <- counties(cb = TRUE, state = "CA") |>
+  st_transform(crs = 4267) # project to NAD 27
+
+# filter for counties in watershed
+watershed_counties <- ca_counties |>
+  filter(NAME %in% c("Butte", "Plumas", "Sierra", "Lassen", "Yuba"))
+
+# plot counties and flow stations
+library(tmap)
+
+flow_gauge_map <- tm_shape(watershed_counties)+
+  tm_polygons() +
+  tm_shape(df_sf)+
+  tm_dots(fill = "red")
+```
+
+Get map of HUC 8.
+
+```{r}
+# bring in shape file of HUC 18020123
+hucs <- st_read(here("watershed_shape","cat.shp"))
+
+# check crs of points
+st_crs(df_sf) # 4267
+
+# change crs to match flow gauge stations
+st_crs(hucs) <- 5070
+
+# transform to match points
+hucs_proj <- st_transform(hucs, st_crs(df_sf))
+```
+
+Get a map of the watershed and flow gauge stations.
+
+```{r}
+flow_map <- tm_shape(hucs_proj)+
+  tm_polygons()
+
+```
