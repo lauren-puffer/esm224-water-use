@@ -263,17 +263,41 @@ hucs <- st_read(here("watershed_shape","cat.shp"))
 # check crs of points
 st_crs(df_sf) # 4267
 
-# change crs to match flow gauge stations
-st_crs(hucs) <- 5070
+# check crs of watershed shape file
+st_crs(hucs) # NA
 
-# transform to match points
-hucs_proj <- st_transform(hucs, st_crs(df_sf))
+# hucs are in 4269
+st_crs(hucs) <- 6318
+
+# check that they match
+st_crs(df_sf_proj) == st_crs(hucs)
+
+# transform to match the crs of counties
+hucs_proj <- st_transform(hucs, st_crs(watershed_counties))
+df_sf_proj <- st_transform(df_sf, st_crs(watershed_counties))
+
+
+
+# filter for our HUC
+huc_18020123 <- hucs_proj |>
+  filter(HUC8 == "18020123")
 ```
 
 Get a map of the watershed and flow gauge stations.
 
 ```{r}
-flow_map <- tm_shape(hucs_proj)+
-  tm_polygons()
+# make mape of flow stations
+flow_map <- tm_shape(huc_18020123) +
+  tm_polygons(fill = "lightblue") +
+  tm_shape(df_sf_proj) +
+  tm_dots(col = "red", size = 0.2)
 
+flow_map
+```
+
+Export csv
+
+```{r}
+# write csv
+write.csv(flow_station_df, here("data", "flow_stations.csv"))
 ```
