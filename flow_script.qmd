@@ -301,3 +301,62 @@ Export csv
 # write csv
 write.csv(flow_station_df, here("data", "flow_stations.csv"))
 ```
+
+# Point sources
+
+Load data
+
+```{r}
+# read in point source data
+pt_source <- read.csv(here("data", "PCS_data_MF.csv")) |>
+  clean_names()
+
+# make geometries out of data frame
+points_sf <- st_as_sf(pt_source,
+                      coords = c("facility_latitude", "facility_longitude"),
+                      crs = 4269) # 4326 is the EPSG code for NAD83 lat/long
+
+# bring in shape file of watershed
+hucs <- st_read(here("watershed_shape","cat.shp"))
+st_crs(hucs) <- 26910 # UTM Zone 10
+
+
+# filter for our HUC
+huc_18020123 <- hucs |>
+  filter(HUC8 == "18020123")
+
+# transform to fit points
+points_proj <- st_transform(points_sf, 26910)
+
+# check that CRSs match
+st_crs(points_proj) == st_crs(huc_18020123)
+```
+
+## Troubleshooting
+
+```{r}
+# check bbox
+st_bbox(huc_18020123)
+st_bbox(points_proj)
+
+# make geometries
+
+```
+
+## Plot point sources
+
+Now we can attempt to plot these two on top of eachother (watershed boundary and point sources).
+
+```{r}
+tmap_mode("plot")
+
+
+tm_shape(huc_18020123) +
+  tm_polygons() +
+  tm_shape(points_proj) +
+  tm_dots(fill = "red", size = 0.5)
+
+# try plotting just the points
+plot(st_geometry(points_proj), add = TRUE, col = "red", pch = 20)
+
+```
