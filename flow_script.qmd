@@ -313,8 +313,8 @@ pt_source <- read.csv(here("data", "PCS_data_MF.csv")) |>
 
 # make geometries out of data frame
 points_sf <- st_as_sf(pt_source,
-                      coords = c("facility_latitude", "facility_longitude"),
-                      crs = 4269) # 4326 is the EPSG code for NAD83 lat/long
+                      coords = c("facility_longitude", "facility_latitude"),
+                      crs = 3857) # 3857 is the EPSG code for Web Mercator lat/long
 
 # bring in shape file of watershed
 hucs <- st_read(here("watershed_shape","cat.shp"))
@@ -339,8 +339,7 @@ st_crs(points_proj) == st_crs(huc_18020123)
 st_bbox(huc_18020123)
 st_bbox(points_proj)
 
-# make geometries
-
+# see 
 ```
 
 ## Plot point sources
