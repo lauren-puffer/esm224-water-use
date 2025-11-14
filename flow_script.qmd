@@ -17,6 +17,8 @@ library(tigris)
 library(here)
 library(sf)
 library(stars)
+library(dplyr)
+library(ggplot2)
 ```
 
 ## Load data
@@ -313,8 +315,8 @@ pt_source <- read.csv(here("data", "PCS_data_MF.csv")) |>
 
 # make geometries out of data frame
 points_sf <- st_as_sf(pt_source,
-                      coords = c("facility_longitude", "facility_latitude"),
-                      crs = 3857) # 3857 is the EPSG code for Web Mercator lat/long
+                      coords = c("facility_latitude", "facility_longitude"),
+                      crs = 4326) # WGS 84 (degrees)
 
 # bring in shape file of watershed
 hucs <- st_read(here("watershed_shape","cat.shp"))
@@ -327,6 +329,10 @@ huc_18020123 <- hucs |>
 
 # transform to fit points
 points_proj <- st_transform(points_sf, 26910)
+
+# plot points 
+plot(st_geometry(points_proj), col = "red", pch = 20)
+
 
 # check that CRSs match
 st_crs(points_proj) == st_crs(huc_18020123)
@@ -359,3 +365,118 @@ tm_shape(huc_18020123) +
 plot(st_geometry(points_proj), add = TRUE, col = "red", pch = 20)
 
 ```
+
+## Dataframe of point sources
+
+Get names of unique sources and the number of pollutants belonging to each one's permit.
+
+```{r}
+
+# data frame of pollutant count by permit holder
+df_pollutant_counts <- pt_source |>
+  group_by(facility_name) |>
+  summarise(n_unique_pollutants = n_distinct(pollutant_name))
+
+# data frame of pollutant name by permit holder
+df_combined <- pt_source |>
+  group_by(facility_name) |>
+  summarise(pollutant_name = paste(unique(pollutant_name), collapse = ", "))
+
+# join datasets
+pollutant_join <- left_join(df_pollutant_counts, df_combined, by = "facility_name")
+
+library(kableExtra)
+
+# make a table using kable
+kable(
+  pollutant_join,
+  format = "html",
+  caption = "Number of Pollutants by Permit",
+  col.names = c("Name of Facility", "# of Pollutants on Permit", "Pollutants"), # Custom column names
+  align = c("c"), # Left, Center, Right alignment for columns
+  row.names = FALSE # Hide row names
+)
+
+# Create a styled table
+pollutant_join |>
+  kable(
+    col.names = c("Name of Facility", "Number of Pollutants", "Pollutant Name"),
+    caption = "Pollutants by permit",
+      align = "l" # Left, Center, Right alignment for columns
+  ) |>
+  kable_styling(
+    bootstrap_options = "striped",
+    full_width = FALSE,
+    font_size = 14
+  ) |>
+  row_spec(0, extra_css = "font-family: 'EB Garamond', serif;") |>
+  row_spec(1:2, extra_css = "font-family: 'EB Garamond', serif;")
+```
+
+Get graph of contaminant concentrations per point source.
+
+```{r}
+# df for delleker
+delleker_pt_source <- pt_source |>
+  filter(facility_name == "DELLEKER WWTP")|>
+  mutate(average_daily_flow_mgd = as.numeric(average_daily_flow_mgd))
+
+# df for portala
+portola_pt_source <- pt_source |>
+  filter(facility_name == "PORTOLA WWTP") |>
+  mutate(average_daily_flow_mgd = as.numeric(average_daily_flow_mgd))
+
+
+
+
+# graph of annual pounds of pollutants from Delleker
+delleker_discharge <- ggplot(delleker_pt_source, 
+                             aes(x = pollutant_name, 
+                                 y = total_pounds_lb_yr)) +
+  geom_col(fill = "steelblue") +
+  labs(
+    title = "Annual Pounds of Contaminant (lbs/yr) - Delleker WWTP",
+    x = "Pollutant",
+    y = "Total Pounds (2025)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+# graph of annual pounds of pollutants from Portola
+portola_discharge <- ggplot(portola_pt_source, 
+                             aes(x = pollutant_name, 
+                                 y = total_pounds_lb_yr)) +
+  geom_col(fill = "steelblue") +
+  labs(
+    title = "Annual Pounds of Contaminant (lbs/yr) - Portola WWTP",
+    x = "Pollutant",
+    y = "Total Pounds (2025)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Save both plots!
+
+```{r}
+# save the Delleker plot
+ggsave(here("plots", "delleker_discharge.png"), delleker_discharge, 
+       width = 7, height = 5, bg = "white")
+
+# save the Portola plot
+ggsave(here("plots", "porotla_discharge.png"), portola_discharge, 
+       width = 7, height = 5, bg = "white")
+```
+
+Make a table with the pollutants belonging to each permit holder.
+
+```{r}
+df_combined <- pt_source |>
+  group_by(facility_name) |>
+  summarise(pollutant_name = paste(unique(pollutant_name), collapse = ", "))
+
+```
+
+Discrecpancy about the fact the the facility may not release a pollutant even though it is listed on the permit. This is because permits must be conservative and are deisgned prior to facility operations. Any contaminant that could reasonably be created from a facility should be on the permit.
