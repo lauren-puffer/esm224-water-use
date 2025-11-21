@@ -18,6 +18,7 @@ library(here)
 library(sf)
 library(stars)
 library(dplyr)
+library(kableExtra)
 library(ggplot2)
 ```
 
@@ -480,3 +481,191 @@ df_combined <- pt_source |>
 ```
 
 Discrecpancy about the fact the the facility may not release a pollutant even though it is listed on the permit. This is because permits must be conservative and are deisgned prior to facility operations. Any contaminant that could reasonably be created from a facility should be on the permit.
+
+# Stormwater analysis
+
+We have to bring in the precipitation data and categorize it by precipitation in inches. This allows us to examine how many storms occurred over a 10 year period and the severity of those storms. The following categories are storm events, storm events \> 1 inch, storm events \> 2 inch, and storm events \> 4 inches. We will use 2 weather stations for this analysis (Near Oroville and near Portola)
+
+## Table of storm severity
+
+```{r}
+# Bring in precipitation data
+oroville_weather <- read.csv(here("data", "oroville_weather.csv")) |>
+  clean_names()
+portola_weather <- read.csv(here("data", "portola_weather.csv"))|>
+  clean_names()
+
+# Get date in proper format using lubridate 
+oroville_weather$date <- mdy(oroville_weather$date)
+portola_weather$date <- mdy(portola_weather$date)
+
+# Get dataset with a column for category of storm
+oroville_weather$storm <- cut(
+  oroville_weather$prcp,
+  breaks = c(-Inf, 1, 2, 4, Inf),
+  labels = c("≤1 inch", ">1 inch", ">2 inches", ">4 inches"),
+  right = TRUE
+)
+
+portola_weather$storm <- cut(
+  portola_weather$prcp,
+  breaks = c(-Inf, 1, 2, 4, Inf),
+  labels = c("≤1 inch", ">1 inch", ">2 inches", ">4 inches"),
+  right = TRUE
+)
+
+# Keep only observations between 2015-10-15 and 2024-09-30 at Portola
+portola_weather <- portola_weather |>
+  filter(date >= as.Date("2015-10-15") &
+         date <= as.Date("2024-09-30"))
+
+# Keep only observations between 2015-10-15 and 2024-09-30 at Oroville
+oroville_weather <- oroville_weather |>
+  filter(date >= as.Date("2015-10-15") &
+         date <= as.Date("2024-09-30"))
+```
+
+Create a table with percentage of storms from each category and number of storms.
+
+```{r}
+# Combine the two datasets
+combined_storms <- bind_rows(
+  portola_weather |>
+    mutate(site = "Portola"),
+  oroville_weather |>
+    mutate(site = "Oroville"))
+
+# Get a dataset that has the number of each storm
+storm_summary <- combined_storms |>
+  count(site, storm, name = "count") |>
+  group_by(site) |>
+  mutate(percent = round(100 * count / sum(count), 1))
+
+kable(storm_summary,
+      caption = "Storm Categories at Portola and Oroville",
+      col.names = c("Site", "Storm Category", "Count", "Percent of Total")) |>
+  kable_styling(
+    full_width = TRUE,
+    bootstrap_options = c("striped")
+  )
+
+```
+
+Since the two sites are so similar, lets create a table just for one of the sites to represent the precipitation of the entire watershed.
+
+```{r}
+# Get summary of storms at Portola station
+portola_storm_summary <- portola_weather |>
+  count(storm, name = "count") |>
+  mutate(percent = round(100 * count / sum(count), 1))
+
+# Make table of storm category
+kable(portola_storm_summary, caption = "Frequency of Storms from 2015-2024",
+      col.names = c("Storm Category", "Count", "Percent of Total")) |>
+  kable_classic(full_width = TRUE) |>
+    kable_styling(
+    full_width = TRUE,
+    bootstrap_options = c("striped")
+  )
+```
+
+Now we have to bring in data for stormwater flows. We will use 1 downstream gauge station for this analysis.
+
+```{r}
+# Read in flow gauge data
+strawb_flow <- read.csv(here("data", "flow_gauges", "SF FEATHER R BL DIV DAM NR STRA.csv"))|>
+  clean_names()
+
+# Use lubridate to clean date column
+strawb_flow$date <- mdy_hm(strawb_flow$date)
+
+# Keep only observations between 2015-10-15 and 2024-09-30
+strawb_flow <- strawb_flow |>
+  filter(date >= as.Date("2015-10-15") &
+         date <= as.Date("2024-09-30"))
+```
+
+Now to parse the data out, we will get monthly values of precipitation and flow.
+
+```{r}
+# portola_weather has a PRCP column in inches and a date column
+portola_monthly <- portola_weather |>
+  mutate(month = floor_date(date, "month")) |>
+  group_by(month) |>
+  summarize(monthly_prcp = sum(prcp, na.rm = TRUE))
+
+# Monthly discharge (mean)
+strawb_monthly <- strawb_flow |>
+  mutate(month = floor_date(date, "month")) |>
+  group_by(month) |>
+  summarize(monthly_discharge = mean(discharge_ft3_s, na.rm = TRUE))
+```
+
+Join the two datasets so that you can plot using one dataset.
+
+```{r}
+# Join discharge with precipitation
+plot_df <- strawb_monthly |>
+  left_join(portola_monthly, by = "month")
+```
+
+Plot the data from the joined dataset.
+
+```{r}
+# Create a scale factor
+range_flow <- range(plot_df$monthly_discharge, na.rm = TRUE)
+range_prcp <- range(plot_df$monthly_prcp, na.rm = TRUE)
+
+k <- max(range_flow) / max(range_prcp)   
+
+# Plot mean monthly discharge over total monthly rainfall
+hydrograph <- ggplot(plot_df, aes(x = month)) +
+
+  # Precip bars
+  geom_col(
+    aes(y = monthly_prcp * k, fill = "Precipitation"),
+    alpha = 1
+  ) +
+
+  # Discharge line
+  geom_line(
+    aes(y = monthly_discharge, color = "Discharge"),
+    linewidth = 1
+  ) +
+
+  # Legends for color and fill
+  scale_color_manual(
+    name = "Legend",
+    values = c("Discharge" = "#2A788EFF")
+  ) +
+  scale_fill_manual(
+    name = "Legend",
+    values = c("Precipitation" = "#7AD151FF")
+  ) +
+
+  # Axes
+  scale_y_continuous(
+    name = "Mean Monthly Discharge (ft³/s)",
+    sec.axis = sec_axis(~ . / k, name = "Monthly Precipitation (inches)")
+  ) +
+
+  # Labels & theme
+  labs(
+    title = "Mean Discharge and Total Precipitaion per Month",
+       x = "Month"  
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 11)
+  )
+
+
+# Save the graph
+ggsave(filename = here("plots", "hydrograph.png"),
+  plot = hydrograph,
+  width = 10,
+  height = 6,
+  dpi = 300)
+```
