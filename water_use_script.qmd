@@ -251,27 +251,37 @@ plot_data <- county_source_totals |>
 
 ## Plot percentages for ground and surface water
 
+Try this
+
 ```{r}
-# pivot longer AGAIN
-plot_data <- plot_data |>
-  pivot_longer(
-    cols = c(pct_ground, pct_surface),
-    names_to = "source",
-    values_to = "pct"
-  )
-# use plot_data df for geom_col()
+# plot the water use per county
 water_use_plot <- ggplot(plot_data, aes(x = county_name, y = pct, fill = source)) +
   geom_col() +
   scale_y_continuous(labels = scales::percent_format(scale = 1)) +
-  scale_fill_manual(values = colors)+
+scale_fill_manual(
+  values = colors,
+  labels = c(
+    "pct_ground" = "Groundwater",
+    "pct_surface" = "Surface Water"
+  )
+) +
   labs(
     x = "County",
     y = "Percentage of Total Withdrawals",
     fill = "Water Source",
-    title = "Groundwater vs Surface Water Percentage by County"
+    title = "Percent Water Use by Source per County"
   ) +
-  theme_minimal()
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(size = 12),   # increase x-axis label size
+    axis.title.x = element_text(size = 14),  # optional: increase x-axis title size
+    legend.text = element_text(size = 12),   # optional: legend text size
+    legend.title = element_text(size = 13)   # optional: legend title size
+  )
+
 ```
+
+Save the plot!
 
 ```{r}
 # save plot
